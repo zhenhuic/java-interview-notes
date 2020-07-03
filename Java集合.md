@@ -208,15 +208,24 @@ final Node<K,V>[] resize() {
 
 # ConcurrentHashMap
 
-
+[JavaGuide ConcurrentHashMap](https://snailclimb.gitee.io/javaguide/#/docs/java/collection/ConcurrentHashMap)
 
 
 # Java集合相关面试题
 
 ## List遍历时如何删除元素？fail-fast是什么？fail-safe是什么？
 
+使用 Iterator.remove()方法
+
+[快速失败和安全失败](https://juejin.im/post/5be62527f265da617369cdc8)
+
+
 ## 详细介绍HashMap。角度：数据结构、扩容情况、put 查找的详细过程、哈希函数、扩容、容量为什么始终都是 2^N、JDK1.7与JDK1.8的区别。
    
 ## HashMap如何实现线程安全？ConcurrentHashMap的底层实现？JDK1.7与JDK1.8的区别
+
+## ConcurrentLinkedQueue, LinkedBlockingQueue, ArrayBlockingQueue, **PriorityBlockingQueue** and DelayQueue
+
+
 
 
