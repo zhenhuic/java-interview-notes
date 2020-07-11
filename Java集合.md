@@ -224,7 +224,7 @@ final Node<K,V>[] resize() {
    
 ## HashMap如何实现线程安全？ConcurrentHashMap的底层实现？JDK1.7与JDK1.8的区别
 
-## ConcurrentLinkedQueue, LinkedBlockingQueue, ArrayBlockingQueue, **PriorityBlockingQueue** and DelayQueue
+## ConcurrentLinkedQueue, LinkedBlockingQueue, ArrayBlockingQueue, PriorityBlockingQueue and DelayQueue
 
 
 
