@@ -662,25 +662,27 @@ mysql> SHOW TABLES FROM mysql LIKE '%cost%';
 
 # 基于规则的优化
 
+## 查询重写
+
 MySQL依据一些规则，竭尽全力的把糟糕的语句转换成某种可以比较高效执行的形式，这个过程也可以被称作查询重写。
 
-## 条件化简
+- 条件化简
 
-### 移除不必要的括号
+- 移除不必要的括号
 
-### 常量传递（constant_propagation）
+- 常量传递（constant_propagation）
 
-### 等值传递（equality_propagation）
+- 等值传递（equality_propagation）
 
-### 移除没用的条件（trivial_condition_removal）
+- 移除没用的条件（trivial_condition_removal）
 
-### 表达式计算
+- 表达式计算
 
-### HAVING子句和WHERE子句的合并
+- HAVING子句和WHERE子句的合并
 
-如果查询语句中没有出现诸如SUM、MAX等等的聚集函数以及GROUP BY子句，优化器就把HAVING子句和WHERE子句合并起来。
+  如果查询语句中没有出现诸如SUM、MAX等等的聚集函数以及GROUP BY子句，优化器就把HAVING子句和WHERE子句合并起来。
 
-### 常量表检测
+- 常量表检测
 
 ## 外连接消除
 
@@ -915,4 +917,449 @@ Buffer Pool本质是InnoDB向操作系统申请的一块连续的内存空间，
 SHOW ENGINE INNODB STATUS\G
 ```
 
+# 事务
 
+## 事务的概念
+
+把需要保证原子性（Atomicity）、隔离性（Isolation）、一致性（Consistency）和持久性（Durability）的一个或多个数据库操作称之为一个事务（transaction）。
+
+## MySQL中事务的语法
+
+### 开启事务
+
+```sql
+BEGIN;
+
+START TRANSACTION;
+START TRANSACTION READ ONLY;  # 开启一个只读事务
+START TRANSACTION READ ONLY, WITH CONSISTENT SNAPSHOT;  # 开启一个只读事务和一致性读
+START TRANSACTION READ WRITE, WITH CONSISTENT SNAPSHOT;  # 开启一个读写事务和一致性读
+```
+
+### 提交事务
+
+```sql
+BEGIN;
+
+UPDATE account SET balance = balance - 10 WHERE id = 1;
+UPDATE account SET balance = balance + 10 WHERE id = 2;
+
+COMMIT;
+```
+
+### 手动中止事务
+
+```sql
+BEGIN;
+
+UPDATE account SET balance = balance - 10 WHERE id = 1;
+UPDATE account SET balance = balance + 1 WHERE id = 2;
+
+ROLLBACK;
+```
+
+### 自动提交
+
+MySQL中有一个系统变量autocommit：
+
+```sql
+mysql> SHOW VARIABLES LIKE 'autocommit';
++---------------+-------+
+| Variable_name | Value |
++---------------+-------+
+| autocommit    | ON    |
++---------------+-------+
+1 row in set (0.01 sec)
+```
+
+如果我们想关闭这种自动提交的功能，可以使用下边两种方法之一：
+
+- 显式的的使用START TRANSACTION或者BEGIN语句开启一个事务。
+
+- 这样在本次事务提交或者回滚前会暂时关闭掉自动提交的功能。
+
+把系统变量autocommit的值设置为OFF，就像这样：
+
+```sql
+SET autocommit = OFF;
+```
+
+## 隐式提交
+
+某些特殊的语句而导致事务提交的情况称为隐式提交，这些会导致事务隐式提交的语句包括：
+
+- 定义或修改数据库对象的数据定义语言（Data definition language，缩写为：DDL）
+
+  数据库对象，指的就是数据库、表、视图、存储过程等等这些东西。当我们使用CREATE、ALTER、DROP等语句去修改这些所谓的数据库对象时，就会隐式的提交前边语句所属于的事务。
+
+```sql
+BEGIN;
+
+SELECT ... # 事务中的一条语句
+UPDATE ... # 事务中的一条语句
+... # 事务中的其它语句
+
+CREATE TABLE ... # 此语句会隐式的提交前边语句所属于的事务
+```
+
+- 隐式使用或修改mysql数据库中的表
+
+  当我们使用ALTER USER、CREATE USER、DROP USER、GRANT、RENAME USER、REVOKE、SET PASSWORD等语句时也会隐式的提交前边语句所属于的事务。
+
+- 事务控制或关于锁定的语句
+
+  当我们在一个事务还没提交或者回滚时就又使用START TRANSACTION或者BEGIN语句开启了另一个事务时，会隐式的提交上一个事务，比如这样：
+
+```sql
+BEGIN;
+
+SELECT ... # 事务中的一条语句
+UPDATE ... # 事务中的一条语句
+... # 事务中的其它语句
+
+BEGIN; # 此语句会隐式的提交前边语句所属于的事务
+```
+
+  或者使用LOCK TABLES、UNLOCK TABLES等关于锁定的语句也会隐式的提交前边语句所属的事务。
+
+- 加载数据的语句
+
+  使用LOAD DATA语句来批量往数据库中导入数据。
+
+- 关于MySQL复制的一些语句
+
+  使用START SLAVE、STOP SLAVE、RESET SLAVE、CHANGE MASTER TO等语句时也会隐式的提交前边语句所属的事务。
+
+- 其它的一些语句
+
+  使用ANALYZE TABLE、CACHE INDEX、CHECK TABLE、FLUSH、 LOAD INDEX INTO CACHE、OPTIMIZE TABLE、REPAIR TABLE、RESET等语句也会隐式的提交前边语句所属的事务。
+
+### 保存点
+
+```sql
+mysql> SELECT * FROM account;
++----+--------+---------+
+| id | name   | balance |
++----+--------+---------+
+|  1 | 狗哥   |      11 |
+|  2 | 猫爷   |       2 |
++----+--------+---------+
+2 rows in set (0.00 sec)
+
+mysql> BEGIN;
+
+mysql> UPDATE account SET balance = balance - 10 WHERE id = 1;
+
+mysql> SAVEPOINT s1;    # 一个保存点
+
+mysql> SELECT * FROM account;
++----+--------+---------+
+| id | name   | balance |
++----+--------+---------+
+|  1 | 狗哥   |       1 |
+|  2 | 猫爷   |       2 |
++----+--------+---------+
+2 rows in set (0.00 sec)
+
+mysql> UPDATE account SET balance = balance + 1 WHERE id = 2; # 更新错了
+
+mysql> ROLLBACK TO s1;  # 回滚到保存点s1处
+
+mysql> SELECT * FROM account;
++----+--------+---------+
+| id | name   | balance |
++----+--------+---------+
+|  1 | 狗哥   |       1 |
+|  2 | 猫爷   |       2 |
++----+--------+---------+
+2 rows in set (0.00 sec)
+```
+
+# redo日志
+
+为了保证这个持久性，让已经提交了的事务对数据库中数据所做的修改永久生效，即使后来系统崩溃，在重启后也能把这种修改恢复出来。只需要把修改了哪些东西记录一下就好。
+
+redo日志会把事务在执行过程中对数据库所做的所有修改都记录下来，在之后系统崩溃重启后可以把事务所做的任何修改都恢复出来。
+
+redo日志既包含物理层面的意思，也包含逻辑层面的意思，具体指：
+
+- 物理层面看，这些日志都指明了对哪个表空间的哪个页进行了修改。
+
+- 逻辑层面看，在系统崩溃重启时，并不能直接根据这些日志里的记载，将页面内的某个偏移量处恢复成某个数据，而是需要调用一些事先准备好的函数，执行完这些函数后才可以将页面恢复成系统崩溃前的样子。
+
+# undo 日志
+
+undo log有两个作用：提供回滚和多个行版本控制(MVCC)。
+
+undo log和redo log记录物理日志不一样，它是逻辑日志。可以认为**当delete一条记录时，undo log中会记录一条对应的insert记录**，反之亦然，当update一条记录时，它记录一条对应相反的update记录。
+
+当执行rollback时，就可以从undo log中的逻辑记录读取到相应的内容并进行回滚。有时候应用到行版本控制的时候，也是通过undo log来实现的：当读取的某一行被其他事务锁定时，它可以从undo log中分析出该行记录以前的数据是什么，从而提供该行版本信息，让用户实现非锁定一致性读取。
+
+undo log是采用段(segment)的方式来记录的，每个undo操作在记录的时候占用一个undo log segment。
+
+另外，undo log也会产生redo log，因为undo log也要实现持久性保护。
+
+[详细分析MySQL事务日志(redo log和undo log)](https://juejin.im/entry/5ba0a254e51d450e735e4a1f)
+
+# 事务隔离级别和MVCC
+
+## 事务隔离级别
+
+### 事务并发执行遇到的问题
+
+- 脏写（Dirty Write）
+  
+  一个事务修改了另一个未提交事务修改过的数据。
+
+- 脏读（Dirty Read）
+  
+  一个事务读到了另一个未提交事务修改过的数据。
+
+- 不可重复读（Non-Repeatable Read）
+  
+  一个事务只能读到另一个已经提交的事务修改过的数据，并且其他事务每对该数据进行一次修改并提交后，该事务都能查询得到最新值。
+
+- 幻读（Phantom）
+  
+  一个事务先根据某些条件查询出一些记录，之后另一个事务又向表中插入了符合这些条件的记录，原先的事务再次按照该条件查询时，能把另一个事务插入的记录也读出来。
+
+  那对于先前已经读到的记录，之后又读取不到这种情况，其实这相当于对每一条记录都发生了**不可重复读**的现象。**幻读**只是重点强调了读取到了之前读取没有获取到的记录。
+
+### SQL标准中的四种隔离级别
+
+这些问题也有轻重缓急之分，我们给这些问题按照严重性来排一下序：
+
+```txt
+脏写 > 脏读 > 不可重复读 > 幻读
+```
+
+设立一些隔离级别，隔离级别越低，越严重的问题就越可能发生。
+
+|隔离级别|脏读|不可重复读|幻读|
+|-|-|-|-|
+|READ UNCOMMITTED|Possible|Possible|Possible|
+|READ COMMITTED|Not Possible|Possible|Possible|
+|REPEATABLE READ|Not Possible|Not Possible|Possible|
+|SERIALIZABLE|Not Possible|Not Possible|Not Possible|
+
+也就是说：
+
+- READ UNCOMMITTED隔离级别下，可能发生脏读、不可重复读和幻读问题。
+
+- READ COMMITTED隔离级别下，可能发生不可重复读和幻读问题，但是不可以发生脏读问题。
+
+- REPEATABLE READ隔离级别下，可能发生幻读问题，但是不可以发生脏读和不可重复读的问题。
+
+- SERIALIZABLE隔离级别下，各种问题都不可以发生。
+
+脏脏写这个问题太严重了，不论是哪种隔离级别，都不允许脏写的情况发生。
+
+MySQL在REPEATABLE READ隔离级别下，是可以禁止幻读问题的发生的。
+
+#### 如何设置事务的隔离级别
+
+修改事务的隔离级别：
+
+```sql
+SET [GLOBAL|SESSION] TRANSACTION ISOLATION LEVEL level;
+
+SET GLOBAL TRANSACTION ISOLATION LEVEL SERIALIZABLE;  # 在全局范围影响
+SET SESSION TRANSACTION ISOLATION LEVEL SERIALIZABLE;  # 在会话范围影响
+SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;  # 只对执行语句后的下一个事务产生影响
+```
+
+查看当前会话默认的隔离级别可以通过查看系统变量transaction_isolation的值来确定：
+
+```sql
+SHOW VARIABLES LIKE 'transaction_isolation';
+SELECT @@transaction_isolation;
+```
+
+# MVCC原理
+
+## 版本链
+
+聚簇索引记录中都包含两个必要的隐藏列（row_id并不是必要的，我们创建的表中有主键或者非NULL的UNIQUE键时都不会包含row_id列）：
+
+- trx_id：每次一个事务对某条聚簇索引记录进行改动时，都会把该事务的事务id赋值给trx_id隐藏列。
+
+- roll_pointer：每次对某条聚簇索引记录进行改动时，都会把旧的版本写入到undo日志中，然后这个隐藏列就相当于一个指针，可以通过它来找到该记录修改前的信息。
+
+每次对记录进行改动，都会记录一条undo日志，每条undo日志也都有一个roll_pointer属性（INSERT操作对应的undo日志没有该属性，因为该记录并没有更早的版本），可以将这些undo日志都连起来，串成一个链表，所以现在的情况就像下图一样：
+
+![版本链](assets/版本链.jpg)
+
+对该记录每次更新后，都会将旧值放到一条undo日志中，就算是该记录的一个旧版本，随着更新次数的增多，所有的版本都会被roll_pointer属性连接成一个链表，我们把这个链表称之为版本链，**版本链的头节点就是当前记录最新的值**。另外，每个版本中还包含生成该版本时对应的事务id。
+
+## ReadView
+
+假如另一个事务已经修改了记录但是尚未提交，是不能直接读取最新版本的记录的，核心问题就是：需要判断一下版本链中的哪个版本是当前事务可见的。为此，InnoDB提出了一个ReadView的概念，这个ReadView中主要包含4个比较重要的内容：
+
+- m_ids：表示在生成ReadView时当前系统中活跃的读写事务的事务id列表。
+
+- min_trx_id：表示在生成ReadView时当前系统中活跃的读写事务中最小的事务id，也就是m_ids中的最小值。
+
+- max_trx_id：表示生成ReadView时系统中应该分配给下一个事务的id值。
+
+  > 注意max_trx_id并不是m_ids中的最大值，事务id是递增分配的。比方说现在有id为1，2，3这三个事务，之后id为3的事务提交了。那么一个新的读事务在生成ReadView时，m_ids就包括1和2，min_trx_id的值就是1，max_trx_id的值就是4。
+
+- creator_trx_id：表示生成该ReadView的事务的事务id。
+
+  > 只有在对表中的记录做改动时（执行INSERT、DELETE、UPDATE这些语句时）才会为事务分配事务id，否则在一个只读事务中的事务id值都默认为0。
+
+有了这个ReadView，这样在访问某条记录时，只需要按照下边的步骤判断记录的某个版本是否可见：
+
+- 如果被访问版本的trx_id属性值与ReadView中的creator_trx_id值相同，意味着当前事务在访问它自己修改过的记录，所以该版本可以被当前事务访问。
+
+- 如果被访问版本的trx_id属性值小于ReadView中的min_trx_id值，表明生成该版本的事务在当前事务生成ReadView前已经提交，所以该版本可以被当前事务访问。
+
+- 如果被访问版本的trx_id属性值大于或等于ReadView中的max_trx_id值，表明生成该版本的事务在当前事务生成ReadView后才开启，所以该版本不可以被当前事务访问。
+
+- 如果被访问版本的trx_id属性值在ReadView的min_trx_id和max_trx_id之间，那就需要判断一下trx_id属性值是不是在m_ids列表中，如果在，说明创建ReadView时生成该版本的事务还是活跃的，该版本不可以被访问；如果不在，说明创建ReadView时生成该版本的事务已经被提交，该版本可以被访问。
+
+在MySQL中，READ COMMITTED和REPEATABLE READ隔离级别的的一个非常大的区别就是它们**生成ReadView的时机不同**。
+
+## MVCC（Multi-Version Concurrency Control ，多版本并发控制）
+
+MVCC指的就是在使用**READ COMMITTD**、**REPEATABLE READ**这两种隔离级别的事务在执行普通的SELECT操作时访问记录的版本链的过程，这样子可以使不同事务的读-写、写-读操作并发执行，从而提升系统性能。
+
+READ COMMITTD、REPEATABLE READ这两个隔离级别的一个很大不同就是：生成ReadView的时机不同，**READ COMMITTD在每一次进行普通SELECT操作前都会生成一个ReadView**，而**REPEATABLE READ只在第一次进行普通SELECT操作前生成一个ReadView，之后的查询操作都重复使用这个ReadView就好了**。
+
+> 执行DELETE语句或者更新主键的UPDATE语句并不会立即把对应的记录完全从页面中删除，而是执行一个所谓的delete mark操作，相当于只是对记录打上了一个删除标志位，这主要就是为MVCC服务的，大家可以对比上边举的例子自己试想一下怎么使用。 另外，所谓的MVCC只是在我们进行普通的SEELCT查询时才生效，截止到目前我们所见的所有SELECT语句都算是普通的查询。
+
+## 关于purge
+
+我们说insert undo在事务提交之后就可以被释放掉了，而update undo由于还需要支持MVCC，不能立即删除掉。
+
+为了支持MVCC，对于delete mark操作来说，仅仅是在记录上打一个删除标记，并没有真正将它删除掉。
+
+随着系统的运行，在确定系统中包含最早产生的那个ReadView的事务不会再访问某些update undo日志以及被打了删除标记的记录后，有一个后台运行的purge线程会把它们真正的删除掉
+
+# 锁
+
+获取锁成功，或者加锁成功，然后就可以继续执行操作了。获取锁失败，或者加锁失败，或者没有成功的获取到锁，当前事务需要等待。
+
+![InnoDB锁结构](assets/InnoDB锁结构.jpg)
+
+解决脏读、不可重复读、幻读这些问题有两种可选的解决方案：
+
+- 方案一：读操作利用多版本并发控制（MVCC），写操作进行加锁。
+
+- 方案二：读、写操作都采用加锁的方式。
+
+采用MVCC方式的话，读-写操作彼此并不冲突，性能更高，采用加锁方式的话，读-写操作彼此需要排队执行，影响性能。一般情况下我们当然愿意采用MVCC来解决读-写操作并发执行的问题，但是业务在某些特殊情况下，要求必须采用加锁的方式执行，那也是没有办法的事。
+
+## 一致性读（Consistent Reads）
+
+事务利用MVCC进行的读取操作称之为一致性读，或者一致性无锁读，有的地方也称之为快照读。所有普通的SELECT语句（plain SELECT）在READ COMMITTED、REPEATABLE READ隔离级别下都算是一致性读，比方说：
+
+```sql
+SELECT * FROM t;
+SELECT * FROM t1 INNER JOIN t2 ON t1.col1 = t2.col2
+```
+
+一致性读并不会对表中的任何记录做加锁操作，其他事务可以自由的对表中的记录做改动。
+
+## 锁定读（Locking Reads）
+
+### 共享锁和独占锁
+
+- 对读取的记录加共享锁：
+
+```sql
+SELECT ... LOCK IN SHARE MODE;
+```
+
+- 对读取的记录加独占锁：
+
+```sql
+SELECT ... FOR UPDATE;
+```
+
+- 写操作DELETE、UPDATE、INSERT自动加独占锁或隐式锁
+
+## 多粒度锁
+
+- **意向共享锁**，英文名：Intention Shared Lock，简称IS锁。当事务准备在某条记录上加S锁时，需要先在表级别加一个IS锁。
+
+- **意向独占锁**，英文名：Intention Exclusive Lock，简称IX锁。当事务准备在某条记录上加X锁时，需要先在表级别加一个IX锁。
+
+IS、IX锁是**表级锁**，它们的提出仅仅为了在之后加表级别的S锁和X锁时可以快速判断表中的记录是否被上锁，以避免用遍历的方式来查看表中有没有上锁的记录，也就是说其实IS锁和IX锁是兼容的，IX锁和IX锁是兼容的。
+
+## MySQL中的行锁和表锁
+
+### InnoDB中的表级锁
+
+- 表级别的S锁、X锁
+
+- 表级别的IS锁、IX锁
+  
+  当我们在对使用InnoDB存储引擎的表的某些记录加S锁之前，那就需要先在表级别加一个IS锁，当我们在对使用InnoDB存储引擎的表的某些记录加X锁之前，那就需要先在表级别加一个IX锁。IS锁和IX锁的使命只是为了后续在加表级别的S锁和X锁时判断表中是否有已经被加锁的记录，以避免用遍历的方式来查看表中有没有上锁的记录。
+
+- 表级别的AUTO-INC锁
+  
+  系统实现这种自动给AUTO_INCREMENT修饰的列递增赋值的原理主要是两个：
+
+  - 采用AUTO-INC锁，也就是在执行插入语句时就在表级别加一个AUTO-INC锁，然后为每条待插入记录的AUTO_INCREMENT修饰的列分配递增的值，在该语句执行结束后，再把AUTO-INC锁释放掉。这样一个事务在持有AUTO-INC锁的过程中，其他事务的插入语句都要被阻塞，可以保证一个语句中分配的递增值是连续的。
+  
+  > AUTO-INC锁的作用范围只是单个插入语句，插入语句执行完成后，这个锁就被释放了，跟我们之前介绍的锁在事务结束时释放是不一样的。
+
+  - 采用一个轻量级的锁，在为插入语句生成AUTO_INCREMENT修饰的列的值时获取一下这个轻量级锁，然后生成本次插入语句需要用到的AUTO_INCREMENT列的值之后，就把该轻量级锁释放掉，并不需要等到整个插入语句执行完才释放锁。
+
+### InnoDB中的行级锁
+
+在记录上加的锁。
+
+#### 行锁类型
+
+- Record Locks
+  
+  正经记录锁（LOCK_REC_NOT_GAP）是有S锁和X锁之分的，让我们分别称之为S型正经记录锁和X型正经记录锁，当一个事务获取了一条记录的S型正经记录锁后，其他事务也可以继续获取该记录的S型正经记录锁，但不可以继续获取X型正经记录锁；当一个事务获取了一条记录的X型正经记录锁后，其他事务既不可以继续获取该记录的S型正经记录锁，也不可以继续获取X型正经记录锁。
+
+- Gap Locks
+  
+  MySQL在REPEATABLE READ隔离级别下是可以解决幻读问题的，解决方案有两种，可以使用**MVCC方案**解决，也可以采用**加锁**方案解决。Gap Locks，官方的类型名称为：LOCK_GAP。
+
+![gap锁](assets/gap锁.jpg)
+
+  如图中为number值为8的记录加了gap锁，意味着不允许别的事务在number值为8的记录前边的间隙插入新记录，其实就是number列的值(3, 8)这个区间的新记录是不允许立即插入的。
+
+  gap锁的提出仅仅是为了**防止插入幻影记录**而提出的。
+
+- Next-Key Locks
+
+  有时候我们既想锁住某条记录，又想阻止其他事务在该记录前边的间隙插入新记录，所以设计InnoDB的大叔们就提出了一种称之为Next-Key Locks的锁，官方的类型名称为：LOCK_ORDINARY。
+
+  ![Next-key锁](assets/Next-key锁.jpg)
+
+  **next-key锁**的本质就是一个正经**记录锁**和一个**gap锁**的合体，它既能保护该条记录，又能阻止别的事务将新记录插入被保护记录前边的间隙。
+
+- Insert Intention Locks
+
+  我们说一个事务在插入一条记录时需要判断一下插入位置是不是被别的事务加了所谓的gap锁（next-key锁也包含gap锁，后边就不强调了），如果有的话，插入操作需要等待，直到拥有gap锁的那个事务提交。但是设计InnoDB的大叔规定事务在等待的时候也需要在内存中生成一个锁结构，表明有事务想在某个间隙中插入新记录，但是现在在等待。
+
+  InnoDB的就把这种类型的锁命名为Insert Intention Locks，官方的类型名称为：LOCK_INSERT_INTENTION，我们也可以称为插入意向锁。
+
+  ![插入意向锁](assets/插入意向锁.jpg)
+
+  插入意向锁并不会阻止别的事务继续获取该记录上任何类型的锁。
+
+- 隐式锁
+  
+  一个事务对新插入的记录可以不显式的加锁（生成一个锁结构），但是由于事务id这个牛逼的东东的存在，相当于加了一个隐式锁。别的事务在对这条记录加S锁或者X锁时，由于隐式锁的存在，会先帮助当前事务生成一个锁结构，然后自己再生成一个锁结构后进入等待状态。
+
+### InnoDB锁的内存结构
+
+InnoDB本着勤俭节约的传统美德，决定在对不同记录加锁时，如果符合下边这些条件：
+
+- 在同一个事务中进行加锁操作
+
+- 被加锁的记录在同一个页面中
+
+- 加锁的类型是一样的
+
+- 等待状态是一样的
+
+那么这些记录的锁就可以被放到一个锁结构中。
+
+![InnoDB锁的内存结构](assets/InnoDB锁的内存结构.jpg)
