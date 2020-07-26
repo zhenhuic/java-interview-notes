@@ -237,7 +237,6 @@ java 只支持单继承，这是由于安全性的考虑，如果子类继承的
 3. 一个类可以实现多个接口，但最多只能实现一个抽象类
 4. 一个类实现接口的话要实现接口的所有方法，而抽象类不一定
 
-
 ## 枚举
 
 当我们使用 enmu 来定义一个枚举类型的时候，编译器会自动帮我们创建一个 final 类型的类继承 Enum 类，所以枚举类型不能被继承
@@ -250,22 +249,32 @@ java 只支持单继承，这是由于安全性的考虑，如果子类继承的
 
 # Java 异常体系
 
-1. Java 异常的分类与处理方式
+## Java 异常的分类与处理方式
+
+[Java提高篇——Java 异常处理](https://www.cnblogs.com/Qian123/p/5715402.html)
 
 [异常的概念和Java异常体系结构](https://blog.csdn.net/liuhenghui5201/article/details/18675391)
 
 [揭晓Java异常体系中的秘密](https://juejin.im/post/5aa64da06fb9a028d4443b61)
 
+## 常见的异常
+
+[Java常见异常总结](https://www.jianshu.com/p/a03c8807bbbc)
+
+[Java ConcurrentModificationException异常原因和解决方法](https://www.cnblogs.com/dolphin0520/p/3933551.html)
+
 # 泛型
 
 ## 讲讲什么是泛型
+
+[深入理解Java泛型](https://juejin.im/post/5b614848e51d45355d51f792)
 
 泛型是一种参数化类型，它的<>里面可以放任何类型，而且不要强转，它是多态的一种体现。 泛型多用于容器中，往容器中方数据，事先约定什么类型数据，放的时候会检查，不是正确的类型放入时会报错，这样可以建立安全的数据，也避免了强制类型转换。
 
 泛型也是 Java 提供的语法糖,只不过是将类型检查从运行期提到编译器.运行时都会被擦除为 Object.,运行的时候都会在方法的入口和出口进行转换(就是发生擦除的边界位置)。
 
 1. 泛型以及泛型擦除
-2. List<>类型的list,可以加入无继承关系的B类型对象吗？如何加入？
+2. List<>类型的list，可以加入无继承关系的B类型对象吗？如何加入？
 
 对于 Java 虚拟机来说，他根本不认识 `Map<String, String> map` 这样的语法。需要在编译阶段通过类型擦除的方式进行解语法糖。
 
@@ -273,6 +282,11 @@ java 只支持单继承，这是由于安全性的考虑，如果子类继承的
 
 ## 反射原理以及使用场景
 
+[Java 反射由浅入深 | 进阶必备](https://juejin.im/post/598ea9116fb9a03c335a99a4)
+
+[大白话说Java反射：入门、使用、原理](https://www.cnblogs.com/chanshuyi/p/head_first_of_reflection.html)
+
+[在Java的反射中，Class.forName和ClassLoader的区别](https://zhuanlan.zhihu.com/p/68498855)
 
 ## 如何通过反射创建对象
 
@@ -293,12 +307,9 @@ Object obj = cons.newInstance("lisisi",23);
 
 # 注解
 
-
-
+[JAVA 注解的基本原理](https://juejin.im/post/5b45bd715188251b3a1db54f)
 
 # I/O
-
-
 
 
 
@@ -306,10 +317,11 @@ Object obj = cons.newInstance("lisisi",23);
 
 ## 序列化和反序列化
 
+[java序列化，看这篇就够了](https://juejin.im/post/5ce3cdc8e51d45777b1a3cdf)
+
 ## 反序列化失败的场景
 
-
-
+虚拟机是否允许反序列化，不仅取决于类路径和功能代码是否一致，一个非常重要的一点是两个类的序列化 ID 是否一致（就是 private static final long serialVersionUID = 1L）。
 
 # 正则表达式
 
@@ -333,17 +345,13 @@ p.pattern();//返回 \w+
         Pattern r = Pattern.compile(pattern);
         // 现在创建 matcher 对象
         Matcher m = r.matcher(line);
-        if (m.find( )) {
-            System.out.println("Found value: " + m.group(0) );
-            System.out.println("Found value: " + m.group(1) );
+        if (m.find()) {
+            System.out.println("Found value: " + m.group(0));
+            System.out.println("Found value: " + m.group(1));
         } else {
             System.out.println("NO MATCH");
         }
 ```
-
-
-
-
 
 # Java8新特性
 
@@ -353,7 +361,7 @@ p.pattern();//返回 \w+
 4. 重复注解- 注解有一个很大的限制是：在同一个地方不能多次使用同一个注解。Java 8 打破了这个限制，引入了重复注解的概念，允许在同一个地方多次使用同一个注解
    ...... 等等（重点 lambda 表达式）
 
-## 说说 Lamda 表达式的优缺点。
+## 说说 Lamda 表达式的优缺点
 
 - 优点：1. 简洁; 2. 非常容易并行计算; 3. 可能代表未来的编程趋势
 - 缺点：1. 若不用并行计算，很多时候计算速度没有比传统的 for 循环快。（并行计算有时需要预热才显示出效率优势）2. 不容易调试。3. 若其他程序员没有学过 lambda 表达式，代码不容易让其他语言的程序员看懂。
