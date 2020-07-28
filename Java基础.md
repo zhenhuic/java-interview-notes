@@ -65,6 +65,16 @@ Object 的 hashcode 方法是本地方法，也就是用 C/C++ 实现的，该�
 
 不是，基本数据类型包括：byte,short,int,long,float,double,boolean,char。而 String 是类代表字符串，属于引用类型，所谓引用类型包括：类，接口，数组...
 
+## Java String类为什么是final的
+
+1. 为了实现字符串池
+
+2. 为了线程安全
+
+3. 为了实现String可以创建HashCode不可变性
+
+[在java中String类为什么要设计成final？](https://www.zhihu.com/question/31345592)
+
 ## int 和 Integer 有什么区别
 
 [参考网址](http://www.cnblogs.com/liuling/archive/2013/05/05/intAndInteger.html)
