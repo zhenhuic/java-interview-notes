@@ -48,9 +48,10 @@ Object 的 hashcode 方法是本地方法，也就是用 C/C++ 实现的，该�
 八个基本数据类型：byte，short，int，long，float，double，char，boolean；以及引用类型，引用类型包括类类型、接口类型和数组。整数默认 int 型，小数默认是 double 型，float、long 类型必须加后缀 f、l；
 
 自动装箱和拆箱就是基本类型和其对应引用类型之间的转换，基本类型转换为引用类型后，就可以直接调用包装类中封装好的一些方法
+
 ![](https://ws1.sinaimg.cn/large/d4556b75ly1g3mteb1k1kj20l00eidgb.jpg)
 
-## 什么是值传递和引用传递？
+## 什么是值传递和引用传递
 
 [参考网址](https://www.cnblogs.com/xiaoxiaoyihan/p/4883770.html)
 
@@ -104,16 +105,16 @@ private transient char[] toStringCache
 `toStringCache` 是 StringBuffer 特有，缓存 `toString` 最后一次返回的值。 多次连续调用 `toString` 方法的时候由于这个字段的缓存就可以少了 `Arrays.copyOfRange` 的操作
 
 ```java
-public synchronized String toString() { 
-    if (toStringCache == null) {// toStringCache为空，第一次操作 
-        toStringCache = Arrays.copyOfRange(value, 0, count); 
-    } 
-    // 使用缓存的toStringCache，实际只传递了引用，没有复制操作 
+public synchronized String toString() {
+    if (toStringCache == null) {  // toStringCache为空，第一次操作
+        toStringCache = Arrays.copyOfRange(value, 0, count);
+    }
+    // 使用缓存的toStringCache，实际只传递了引用，没有复制操作
     return new String(toStringCache, true);
 }
 ```
 
-两者方法最大的区别是：StringBuffer 是线程安全的，StringBuilder 是非线程安全的。实现是StringBuffer 在和 StringBuilder 相同的方法上加了 `synchronized` 修饰。 
+两者方法最大的区别是：StringBuffer 是线程安全的，StringBuilder 是非线程安全的。实现是StringBuffer 在和 StringBuilder 相同的方法上加了 `synchronized` 修饰。
 
 StringBuffer的`append()` 方法：
 
