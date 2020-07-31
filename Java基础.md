@@ -167,6 +167,10 @@ public String translate (String str) {
 
 可变参数在被使用的时候，他首先会创建一个数组，数组的长度就是调用该方法时传递的实参的个数，然后再把参数值全部放到这个数组当中，然后再把这个数组作为参数传递到被调用的方法中
 
+## Java finally语句到底是在return之前还是之后执行
+
+[Java finally语句到底是在return之前还是之后执行？](https://www.cnblogs.com/lanxuezaipiao/p/3440471.html)
+
 # 面向对象
 
 ## 三大特性

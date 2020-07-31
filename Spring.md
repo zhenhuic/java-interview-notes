@@ -41,3 +41,4 @@
 
 9. `AbstractAutowireCapableBeanFactory.initializeBean(beanName, exposedObject, mbd);`，Spring回调执行初始化方法初始化bean，这个方法里面`AbstractAutowireCapableBeanFactory.applyBeanPostProcessorsBeforeInitialization(wrappedBean, beanName);`先执行Spring中的内置处理器`xxxPostProcessor`，也就是`@PostConstruct`注释的方法，然后再`AbstractAutowireCapableBeanFactory.invokeInitMethods(beanName, wrappedBean, mbd);`执行接口（`afterPropertiesSet()`方法）和XML初始化方法（init-method定制的初始化方法）。
 
+## 监听器
