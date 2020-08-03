@@ -2,6 +2,8 @@
 
 # HashMap
 
+[《我们一起进大厂》系列-ConcurrentHashMap & Hashtable](https://juejin.im/post/6844904023003250701)
+
 ## 存储结构-字段
 
 从源码可知，HashMap类中有一个非常重要的字段，就是 Node[] table，即哈希桶数组，明显它是一个Node的数组。
@@ -204,12 +206,156 @@ final Node<K,V>[] resize() {
 
 3. HashMap是线程不安全的，不要在并发的环境中同时操作HashMap，建议使用ConcurrentHashMap。
 
-4.  JDK1.8引入红黑树大程度优化了HashMap的性能。
+4. JDK1.8引入红黑树大程度优化了HashMap的性能。
 
 # ConcurrentHashMap
 
 [JavaGuide ConcurrentHashMap](https://snailclimb.gitee.io/javaguide/#/docs/java/collection/ConcurrentHashMap)
 
+## put过程
+
+```java
+final V putVal(K key, V value, boolean onlyIfAbsent) {
+    if (key == null || value == null) throw new NullPointerException();
+    int hash = spread(key.hashCode());
+    int binCount = 0;
+    for (Node<K,V>[] tab = table;;) {
+        Node<K,V> f; int n, i, fh; K fk; V fv;
+        if (tab == null || (n = tab.length) == 0)  // 如果数组为null，初始化数组
+            tab = initTable();
+        else if ((f = tabAt(tab, i = (n - 1) & hash)) == null) {  // 拿到数组里的Node，如果元素为空，创建新的Node，用CAS方式放入数组
+            if (casTabAt(tab, i, null, new Node<K,V>(hash, key, value)))
+                break;                   // no lock when adding to empty bin
+        }
+        else if ((fh = f.hash) == MOVED)  // 如果正在被其他线程扩容，当前线程帮助扩容
+            tab = helpTransfer(tab, f);
+        else if (onlyIfAbsent // check first node without acquiring lock
+                    && fh == hash
+                    && ((fk = f.key) == key || (fk != null && key.equals(fk)))
+                    && (fv = f.val) != null)  // 如果onlyIfAbsent为true，且key已经存在，直接返回原值
+            return fv;
+        else {  // 到这里就是遍历链表或红黑树，添加或修改值
+            V oldVal = null;
+            synchronized (f) {  // 给第一个Node加锁
+                if (tabAt(tab, i) == f) {  // 再次判断是否被修改
+                    if (fh >= 0) {  // hash小于0可能是MOVED，TREEBIN，RESERVED
+                        binCount = 1;
+                        for (Node<K,V> e = f;; ++binCount) {  // 遍历链表
+                            K ek;
+                            if (e.hash == hash &&
+                                ((ek = e.key) == key ||
+                                    (ek != null && key.equals(ek)))) {  // 找到了相等的值
+                                oldVal = e.val;
+                                if (!onlyIfAbsent)
+                                    e.val = value;
+                                break;
+                            }
+                            Node<K,V> pred = e;
+                            if ((e = e.next) == null) {  // 没有相等的值，尾插
+                                pred.next = new Node<K,V>(hash, key, value);
+                                break;
+                            }
+                        }
+                    }
+                    else if (f instanceof TreeBin) {  // 如果是个红黑树
+                        Node<K,V> p;
+                        binCount = 2;
+                        if ((p = ((TreeBin<K,V>)f).putTreeVal(hash, key,
+                                                        value)) != null) {
+                            oldVal = p.val;
+                            if (!onlyIfAbsent)
+                                p.val = value;
+                        }
+                    }
+                    else if (f instanceof ReservationNode)
+                        throw new IllegalStateException("Recursive update");
+                }
+            }  // 退出synchronized
+            if (binCount != 0) {
+                if (binCount >= TREEIFY_THRESHOLD)  // 链表长度大于阈值
+                    treeifyBin(tab, i);  // 这里不在synchronized块里，因为方法内部重新加锁
+                if (oldVal != null)
+                    return oldVal;
+                break;
+            }
+        }
+    }
+    addCount(1L, binCount);  
+    return null;
+}
+```
+
+## 初始化数组
+
+```java
+/**
+* Initializes table, using the size recorded in sizeCtl.
+*/
+private final Node<K,V>[] initTable() {
+    Node<K,V>[] tab; int sc;
+    while ((tab = table) == null || tab.length == 0) {
+        if ((sc = sizeCtl) < 0)
+            Thread.yield(); // lost initialization race; just spin
+        else if (U.compareAndSetInt(this, SIZECTL, sc, -1)) {  // 通过CAS控制只有一个线程初始化
+            try {
+                if ((tab = table) == null || tab.length == 0) {
+                    int n = (sc > 0) ? sc : DEFAULT_CAPACITY;
+                    @SuppressWarnings("unchecked")
+                    Node<K,V>[] nt = (Node<K,V>[])new Node<?,?>[n];
+                    table = tab = nt;
+                    sc = n - (n >>> 2);  // 算出阈值，就是0.75 * n
+                }
+            } finally {
+                sizeCtl = sc;
+            }
+            break;
+        }
+    }
+    return tab;
+}
+```
+
+## addCount和扩容
+
+```java
+private final void addCount(long x, int check) {
+    CounterCell[] cs; long b, s;
+    if ((cs = counterCells) != null ||
+        !U.compareAndSetLong(this, BASECOUNT, b = baseCount, s = b + x)) {
+        CounterCell c; long v; int m;
+        boolean uncontended = true;
+        if (cs == null || (m = cs.length - 1) < 0 ||
+            (c = cs[ThreadLocalRandom.getProbe() & m]) == null ||
+            !(uncontended =
+                U.compareAndSetLong(c, CELLVALUE, v = c.value, v + x))) {
+            fullAddCount(x, uncontended);
+            return;
+        }
+        if (check <= 1)
+            return;
+        s = sumCount();
+    }
+    if (check >= 0) {
+        Node<K,V>[] tab, nt; int n, sc;
+        while (s >= (long)(sc = sizeCtl) && (tab = table) != null &&
+                (n = tab.length) < MAXIMUM_CAPACITY) {
+            int rs = resizeStamp(n);
+            if (sc < 0) {
+                if ((sc >>> RESIZE_STAMP_SHIFT) != rs || sc == rs + 1 ||
+                    sc == rs + MAX_RESIZERS || (nt = nextTable) == null ||
+                    transferIndex <= 0)
+                    break;
+                if (U.compareAndSetInt(this, SIZECTL, sc, sc + 1))
+                    transfer(tab, nt);
+            }
+            else if (U.compareAndSetInt(this, SIZECTL, sc,
+                                            (rs << RESIZE_STAMP_SHIFT) + 2))
+                transfer(tab, null);
+            s = sumCount();
+        }
+    }
+}
+```
 
 # Java集合相关面试题
 

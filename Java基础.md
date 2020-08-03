@@ -2,6 +2,8 @@
 
 # Java 程序基础
 
+## 一致性hash算法
+
 ## ==、equals和hashCode()
 
 [面试官爱问的equals与hashCode](https://juejin.im/post/5a4379d4f265da432003874c)
