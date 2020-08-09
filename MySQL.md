@@ -21,3 +21,5 @@
 [drop,delete与truncate的区别](https://www.jianshu.com/p/9d6c6e5d676f)
 
 ## 加载MySQL驱动类为什么用Class.forName()方法
+
+## 一条SQL的执行过程

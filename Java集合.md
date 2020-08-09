@@ -8,7 +8,7 @@
 
 从源码可知，HashMap类中有一个非常重要的字段，就是 Node[] table，即哈希桶数组，明显它是一个Node的数组。
 
-![](assets/HashMap结构图.png)
+![HashMap结构图](assets/HashMap结构图.png)
 
 Node是HashMap的一个内部类，实现了Map.Entry接口，本质是就是一个映射（键值对）。上图中的每个黑色圆点就是一个Node对象。
 
