@@ -189,7 +189,7 @@ CREATE TABLE index_demo(
 也可以在修改表结构的时候添加索引：
 
 ```sql
-ALTER TABLE 表名 DROP [INDEX|KEY] 索引名;
+ALTER TABLE 表名 ADD [INDEX|KEY] 索引名;
 ```
 
 在这个建表语句中我们创建的索引名是idx_c2_c3，这个名称可以随便起，不过我们还是建议以idx_为前缀，后边跟着需要建立索引的列名，多个列名之间用下划线_分隔开。

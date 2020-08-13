@@ -74,7 +74,7 @@ static final class TreeBin<K,V> extends Node<K,V> {
 
 ## get查询
 
-1. 根据计算出来的 hashcode 寻址，如果就在桶上那么直接返回值。
+1. 根据计算出来的 hashcode 寻址，在获取数组的元素时，**采用Unsafe类的getObjectVolatile方法**，如果就在桶上那么直接返回值。
 
 2. 如果是红黑树那就按照树的方式获取值。
 

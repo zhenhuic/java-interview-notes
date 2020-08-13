@@ -107,3 +107,46 @@ native方法不是用Java语言写的，为了支持它需要使用传统栈，�
 [Java堆内存是线程共享的！面试官：你确定吗？](https://mp.weixin.qq.com/s/Wws24Fhg1nH4dHvtcFYi2g)
 
 ## finalize什么时候执行
+
+## OOM分析及解决
+
+### 为什么会OOM
+
+- 内存泄露：申请使用完的内存没有释放，导致虚拟机不能再次使用该内存，此时这段内存就泄露了，因为申请者不用了，而又不能被虚拟机分配给别人用。
+
+- 内存溢出：申请的内存超出了JVM能提供的内存大小，此时称之为溢出。
+
+### 常见的OOM情况
+
+- java.lang.OutOfMemoryError: Java heap space ------>java堆内存溢出
+
+- java.lang.OutOfMemoryError: PermGen space ------>java永久代溢出，即方法区溢出了
+
+- java.lang.StackOverflowError ------> 不会抛OOM error，但也是比较常见的Java内存溢出。
+
+### OOM分析--heapdump
+
+1. dump堆的内存镜像，可以采用如下两种方式：
+
+   - 设置JVM参数-XX:+HeapDumpOnOutOfMemoryError，设定当发生OOM时自动dump出堆信息。不过该方法需要JDK5以上版本。
+
+   - 使用JDK自带的jmap命令。`jmap -dump:format=b,file=heap.bin <pid>`   其中pid可以通过jps获取。
+
+2. 对dump出的文件进行分析，从而找到OOM的原因：
+
+   - MAT: eclipse memory analyzer, 基于eclipse RCP的内存分析工具。
+   - jhat：JDK自带的java heap analyze tool，可以将堆中的对象以html的形式显示出来，包括对象的数量，大小等等，并支持对象查询语言OQL，分析相关的应用后，可以通过 `http://localhost:7000` 来访问分析结果。
+
+## Java进程CPU使用率高排查
+
+1. jps 获取Java进程的PID。
+
+2. jstack pid >> java.txt 导出CPU占用高进程的线程栈。
+
+3. top -H -p PID 查看对应进程的哪个线程占用CPU过高。
+
+4. echo “obase=16; PID” | bc 将线程的PID转换为16进制,大写转换为小写。
+
+5. 在第二步导出的Java.txt中查找转换成为16进制的线程PID。找到对应的线程栈。
+
+6. 分析负载高的线程栈都是什么业务操作。优化程序并处理问题。
