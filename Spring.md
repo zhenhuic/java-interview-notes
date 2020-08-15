@@ -163,3 +163,11 @@ sharedInstance = getSingleton(beanName, () -> {
 `initializeBean()`初始化，执行所有BPP的`postProcessBeforeInitialization()`，这里会执行`@PostConstruct`，然后执行InitializingBean接口（`afterPropertiesSet()`方法）和init-method定制的初始化方法。
 
 将bean放到singletonObjects缓存里，并从singletonFactories、earlySingletonObjects中移除，也将beanName保存在一个registeredSingletons有序Set里。返回bean。
+
+## Spring事务失效
+
+1. Transactional注解标注方法修饰符为非public时，@Transactional注解将会不起作用。
+
+2. 在类内部调用调用类内部@Transactional标注的方法。
+
+3. 事务方法内部捕捉了异常，没有抛出新的异常，导致事务操作不会进行回滚。
